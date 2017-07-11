@@ -8,7 +8,7 @@ isConnectedToInternet=false
 declare -a additionalLanguages
 
 
-# Check internet connection
+# Previous checking of internet connection
 if ping -c 1 archlinux.org &> /dev/null; then
 	isConnectedToInternet=true
 else
@@ -18,16 +18,8 @@ else
 	reboot
 fi
 
-# Check boot mode
-if [ -d "/sys/firmware/efi/efivars/" ]; then
-	isUEFImode=true
-else
-	isUEFImode=false
-fi
 
-# Update system clock
-timedatectl set-ntp true
-
+### User inputs ###
 # Set keyboard layout
 read -p "Define your keyboard layout (default \"us\"): " keyboardLayout
 loadkeys $keyboardLayout
@@ -56,6 +48,18 @@ if [ $yn1 == "y" ]; then
 fi
 
 
+### Installing process ###
+# Check boot mode
+if [ -d "/sys/firmware/efi/efivars/" ]; then
+	isUEFImode=true
+else
+	isUEFImode=false
+fi
+
+# Update system clock
+timedatectl set-ntp true
+
+
 ###########################################
 # Partitioning and formatting script here #
 ###########################################
@@ -75,19 +79,3 @@ genfstab -U /mnt >> /mnt/etc/fstab
 
 # Change root into the new system
 arch-chroot /mnt
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
