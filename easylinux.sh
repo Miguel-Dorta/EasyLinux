@@ -1,8 +1,9 @@
-#!/bin/bash
+#!/bin/zsh
 
 # Initializing variables
 language="en_US"
 keyboardLayout="us"
+timeZone="/usr/share/zoneinfo/Etc/UTC"
 isUEFImode=false
 isConnectedToInternet=false
 declare -a additionalLanguages
@@ -47,6 +48,21 @@ if [ $yn1 == "y" ]; then
 	#echo ${additionalLanguages[x]}
 fi
 
+# Set time zone
+echo " "
+(cd /usr/share/zoneinfo && ls -d */)
+read -p "Choose your region from the list above: " region
+if [ $region = "America" ]; then
+	(cd /usr/share/zoneinfo/America && ls -d */)
+	read -p "Is your region one of those above? If it's yes, introduce it. If it's not, press ENTER: " subregion
+	if [ subregion != "" ]; then
+		region=$region'/'$subregion
+	fi
+fi
+ls /usr/share/zoneinfo/$region
+read -p "Introduce your city from the list above: " city
+timeZone="/usr/share/zoneinfo/$region/$city"
+
 
 ### Installing process ###
 # Check boot mode
@@ -77,5 +93,8 @@ pacstrap /mnt base
 # Generate fstab file
 genfstab -U /mnt >> /mnt/etc/fstab
 
-# Change root into the new system
-arch-chroot /mnt
+# Operating now into the new system
+arch-chroot /mnt << EOF
+	ln -sf $timeZone /etc/localtime
+	hwclock --systohc
+EOF
