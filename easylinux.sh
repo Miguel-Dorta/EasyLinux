@@ -7,8 +7,6 @@ isUEFImode=false
 isConnectedToInternet=false
 declare -a additionalLanguages
 
-tmp1="en_US"
-
 
 # Check internet connection
 if ping -c 1 archlinux.org &> /dev/null; then
@@ -46,6 +44,7 @@ while [ $yn1 != "y" -a $yn1 != "n" ]; do
 	read -p "Please, write \"y\" or \"n\" (without quotes): " yn1
 done
 if [ $yn1 == "y" ]; then
+	tmp1="en_US"
 	echo "Introduce one language at time and then press ENTER. Introduce \"done\" (without quotes) to finish."
 	while [ $tmp1 != "done" ]; do
 		read -p "# " tmp1
@@ -55,3 +54,40 @@ if [ $yn1 == "y" ]; then
 	done
 	#echo ${additionalLanguages[x]}
 fi
+
+
+###########################################
+# Partitioning and formatting script here #
+###########################################
+
+
+# Sorting mirrors by their speed
+# THIS NEEDS TO BE CHANGED. RANKMIRRORS WILL BE UNAVAILABLE IN THE RELEASE OF PACMAN
+cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
+sed -i 's/^#Server/Server/' /etc/pacman.d/mirrorlist.backup
+rankmirrors -n 6 /etc/pacman.d/mirrorlist.backup > /etc/pacman.d/mirrorlist
+
+# Install base packages
+pacstrap /mnt base
+
+# Generate fstab file
+genfstab -U /mnt >> /mnt/etc/fstab
+
+# Change root into the new system
+arch-chroot /mnt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
