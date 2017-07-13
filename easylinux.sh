@@ -117,6 +117,7 @@ pacstrap /mnt base
 genfstab -U /mnt >> /mnt/etc/fstab
 
 # Adding locations
+echo "$language.UTF-8 UTF-8" >> /mnt/etc/locale.gen
 while [[ ${additionalLanguages[$counter]} ]]; do
 	echo "${additionalLanguages[$counter]}.UTF-8 UTF-8" >> /mnt/etc/locale.gen
 	counter+=1
@@ -127,4 +128,6 @@ arch-chroot /mnt << EOF
 	ln -sf $timeZone /etc/localtime
 	hwclock --systohc
 	locale-gen
+	echo "LANG=$language.UTF-8 UTF-8" > /etc/locale.conf
+	echo "KEYMAP=$keyboardLayout" > /etc/vconsole.conf
 EOF
