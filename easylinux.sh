@@ -4,6 +4,7 @@
 language="en_US"
 keyboardLayout="us"
 timeZone="/usr/share/zoneinfo/Etc/UTC"
+localHostname="arch"
 isUEFImode=false
 isConnectedToInternet=false
 declare -a additionalLanguages
@@ -46,7 +47,6 @@ if [ $yn1 == "y" ]; then
 			additionalLanguages+=($tmp1)
 		fi
 	done
-	#echo ${additionalLanguages[x]}
 fi
 
 # Set time zone
@@ -63,6 +63,9 @@ fi
 ls /usr/share/zoneinfo/$region
 read -p "Introduce your city from the list above: " city
 timeZone="/usr/share/zoneinfo/$region/$city"
+
+# Set hostname
+read -p "Define system's hostname: " localHostname
 
 
 ### Installing process ###
@@ -125,9 +128,39 @@ done
 
 # Operating now into the new system
 arch-chroot /mnt << EOF
+
+	# dding time zone
 	ln -sf $timeZone /etc/localtime
 	hwclock --systohc
+
+	# Adding locations
 	locale-gen
-	echo "LANG=$language.UTF-8 UTF-8" > /etc/locale.conf
+	echo "LANG=$language.UTF-8" > /etc/locale.conf
 	echo "KEYMAP=$keyboardLayout" > /etc/vconsole.conf
+
+	# Adding hostname
+	echo $localHostname > /etc/hostname
+	sed -i "8i 127.0.1.1 $localHostname.localdomain $localHostname"
+
+	# Adding networkmanager
+	pacman -S networkmanager --noconfirm
+	systemctl enable NetworkManager
+	systemctl disable dhcpcd.service
+	systemctl disable dhcpcd@enp0s3.service
+
+	# Adding boot manager
+	if [ isUEFImode = "true" ]; then
+		pacman -S refind-efi --noconfirm
+		refind-install
+	else
+		pacman -S grub
+		grub-install --target=i386-pc #/dev/<boot-partition>
+		grub-mkconfig -o /boot/grub/grub.cfg
+	fi
+
+	exit
 EOF
+
+# Umount partitions & reboot
+umount -R /mnt
+reboot
