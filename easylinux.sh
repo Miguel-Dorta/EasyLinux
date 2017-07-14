@@ -60,12 +60,14 @@ echo " "
 (cd /usr/share/zoneinfo && ls -d */)
 read -p "Choose your region from the list above: " region
 if [ $region = "America" ]; then
+	echo " "
 	(cd /usr/share/zoneinfo/America && ls -d */)
 	read -p "Is your region one of those above? If it's yes, introduce it. If it's not, press ENTER: " subregion
 	if [[ $subregion ]]; then
 		region+="/$subregion"
 	fi
 fi
+echo " "
 ls /usr/share/zoneinfo/$region
 read -p "Introduce your city from the list above: " city
 timeZone="/usr/share/zoneinfo/$region/$city"
@@ -74,13 +76,13 @@ timeZone="/usr/share/zoneinfo/$region/$city"
 read -p "Define system's hostname: " localHostname
 
 # Set installation mode
-echo $'\n1/Clean    2/Dual boot (Windows)    3/Dual boot (Mac)\n'
+echo $'\n1/Clean    2/Dual boot (Windows)    3/Dual boot (Mac)'
 read -p "Choose one of the installation methods from the list above: " installationMode
 while [ $installationMode < 1 -o $installationMode > 3 ]; do
 	read -p "Please, write the number of the installation methods above: " installationMode
 done
 if [ $installationMode != 1 ]; then
-	echo $'\n1/Both OS in the same disk    2/Each OS in a different disk\n'
+	echo $'\n1/Both OS in the same disk    2/Each OS in a different disk'
 	read -p "Choose one of the options: " installationOption
 	while [ $installationOption < 1 -o $installationOption > 2 ]; do
 		read -p "Please, write the number of the options above: " installationOption
@@ -164,38 +166,54 @@ done
 
 # Operating now into the new system
 arch-chroot /mnt << EOF
-
-	# Adding time zone
 	ln -sf $timeZone /etc/localtime
 	hwclock --systohc
 
-	# Adding locations
 	locale-gen
 	echo "LANG=$language.UTF-8" > /etc/locale.conf
 	echo "KEYMAP=$keyboardLayout" > /etc/vconsole.conf
 
-	# Adding hostname
 	echo $localHostname > /etc/hostname
-	sed -i "8i 127.0.1.1 $localHostname.localdomain $localHostname"
+	sed -i "8i 127.0.1.1 $localHostname.localdomain $localHostname" /etc/hosts
 
-	# Adding networkmanager
 	pacman -S networkmanager --noconfirm
-	systemctl enable NetworkManager
+
 	systemctl disable dhcpcd.service
 	systemctl disable dhcpcd@enp0s3.service
-
-	# Adding boot manager
-	if [ isUEFImode = "true" ]; then
-		pacman -S refind-efi --noconfirm
-		refind-install --usedefault $part1
-	else
-		pacman -S grub
-		grub-install --target=i386-pc $part1
-		grub-mkconfig -o /boot/grub/grub.cfg
-	fi
+	systemctl enable NetworkManager
 
 	exit
 EOF
+
+# Installing boot manager
+if [ isUEFImode = "true" ]; then
+	arch-chroot /mnt << EOF
+		pacman -S refind-efi --noconfirm
+
+		refind-install --usedefault $part1
+
+		exit
+	EOF
+
+	if [ -e "/mnt/boot/refind_linux.conf" ]; then
+		echo "rEFInd installed"
+	else
+		sysPartUUID=$(blkid -o value -s UUID ${part2})
+		echo "\"Boot with standard options\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap\"" > /mnt/boot/refind_linux.conf
+		echo "\"Boot to single-user mode\"    \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap single\"" >> /mnt/boot/refind_linux.conf
+		echo "\"Boot with minimal options\"   \"ro root=UUID=$sysPartUUID\"" >> /mnt/boot/refind_linux.conf
+	fi
+fi
+if [ isUEFImode = "false" ]; then
+	arch-chroot /mnt << EOF
+		pacman -S grub --noconfirm
+		
+		grub-install --target=i386-pc $part1 # Command not found
+		grub-mkconfig -o /boot/grub/grub.cfg # Command not found
+
+		exit
+	EOF
+fi
 
 # Umount partitions & reboot
 umount -R /mnt
