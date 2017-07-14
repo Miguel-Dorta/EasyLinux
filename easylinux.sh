@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 
 # Initializing variables
 language="en_US"
@@ -63,7 +63,7 @@ if [ $region = "America" ]; then
 	(cd /usr/share/zoneinfo/America && ls -d */)
 	read -p "Is your region one of those above? If it's yes, introduce it. If it's not, press ENTER: " subregion
 	if [[ $subregion ]]; then
-		region=$region'/'$subregion
+		region+="/$subregion"
 	fi
 fi
 ls /usr/share/zoneinfo/$region
@@ -74,13 +74,13 @@ timeZone="/usr/share/zoneinfo/$region/$city"
 read -p "Define system's hostname: " localHostname
 
 # Set installation mode
-printf "\n1/Clean    2/Dual boot (Windows)    3/Dual boot (Mac)\n"
+echo $'\n1/Clean    2/Dual boot (Windows)    3/Dual boot (Mac)\n'
 read -p "Choose one of the installation methods from the list above: " installationMode
 while [ $installationMode < 1 -o $installationMode > 3 ]; do
 	read -p "Please, write the number of the installation methods above: " installationMode
 done
 if [ $installationMode != 1 ]; then
-	printf "\n1/Both OS in the same disk    2/Each OS in a different disk\n"
+	echo $'\n1/Both OS in the same disk    2/Each OS in a different disk\n'
 	read -p "Choose one of the options: " installationOption
 	while [ $installationOption < 1 -o $installationOption > 2 ]; do
 		read -p "Please, write the number of the options above: " installationOption
@@ -98,8 +98,8 @@ read -p "Select the disk you want to install ArchLinux: " installationDisk
 if [ $yn2 = "y" ]; then
 	read -p "Select the disk where the other OS is installed: " otherDisk
 fi
-part1=$installationDisk+1
-part2=$installationDisk+2
+part1="${installationDisk}1"
+part2="${installationDisk}2"
 
 
 ### Installing process ###
@@ -187,10 +187,10 @@ arch-chroot /mnt << EOF
 	# Adding boot manager
 	if [ isUEFImode = "true" ]; then
 		pacman -S refind-efi --noconfirm
-		refind-install
+		refind-install --usedefault $part1
 	else
 		pacman -S grub
-		grub-install --target=i386-pc #/dev/<boot-partition>
+		grub-install --target=i386-pc $part1
 		grub-mkconfig -o /boot/grub/grub.cfg
 	fi
 
