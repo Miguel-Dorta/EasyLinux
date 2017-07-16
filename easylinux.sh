@@ -6,11 +6,13 @@ keyboardLayout="us"
 timeZone="/usr/share/zoneinfo/Etc/UTC"
 localHostname="arch"
 installationDisk="/dev/sda"
-otherDisk="/dev/sdb"
+bootPart="/dev/sda1"
+sysPart="/dev/sda2"
+otherOSdisk="/dev/sdb"
 isUEFImode=false
 isConnectedToInternet=false
-yn1="n"
-yn2="n"
+yn1="null"
+yn2="null"
 declare -a additionalLanguages
 declare -i installationMode=0
 declare -i installationOption=0
@@ -45,12 +47,12 @@ while [ $yn1 != "y" -a $yn1 != "n" ]; do
 	read -p "Please, write \"y\" or \"n\" (without quotes): " yn1
 done
 if [ $yn1 == "y" ]; then
-	tmp1="en_US"
+	addLang="en_US"
 	echo "Introduce one language at time and then press ENTER. Introduce \"done\" (without quotes) to finish."
-	while [ $tmp1 != "done" ]; do
-		read -p "# " tmp1
-		if [ $tmp1 != "done" -a $tmp1 != "en_US" ]; then
-			additionalLanguages+=($tmp1)
+	while [ $addLang != "done" ]; do
+		read -p "# " addLang
+		if [ $addLang != "done" -a $addLang != "en_US" ]; then
+			additionalLanguages+=($addLang)
 		fi
 	done
 fi
@@ -98,10 +100,8 @@ echo " "
 parted -l
 read -p "Select the disk you want to install ArchLinux: " installationDisk
 if [ $yn2 = "y" ]; then
-	read -p "Select the disk where the other OS is installed: " otherDisk
+	read -p "Select the disk where the other OS is installed: " otherOSdisk
 fi
-part1="${installationDisk}1"
-part2="${installationDisk}2"
 
 
 ### Installing process ###
@@ -117,6 +117,9 @@ timedatectl set-ntp true
 
 # Partitioning and formatting
 if [ $installationMode = 1 ]; then
+	bootPart="${installationDisk}1"
+	sysPart="${installationDisk}2"
+	
 	if [ $isUEFImode = true ]; then
 		# Make partition table
 		parted $installationDisk mklabel gpt
@@ -124,7 +127,7 @@ if [ $installationMode = 1 ]; then
 		# Make EFI partition
 		parted $installationDisk mkpart ESP fat32 1MiB 513MiB
 		parted $installationDisk set 1 boot on
-		mkfs.fat -F32 $part1
+		mkfs.fat -F32 $bootPart
 	else
 		# Make partition table
 		parted $installationDisk mklabel msdos
@@ -132,17 +135,17 @@ if [ $installationMode = 1 ]; then
 		# Make boot partition
 		parted $installationDisk mkpart primary ext4 1MiB 513MiB
 		parted $installationDisk set 1 boot on
-		mkfs.ext4 $part1
-		tune2fs -O ^has_journal $part1
+		mkfs.ext4 $bootPart
+		tune2fs -O ^has_journal $bootPart
 	fi
 	# Make system partition
 	parted $installationDisk mkpart primary xfs 513MiB 100%
-	mkfs.xfs $part2
+	mkfs.xfs $sysPart -f
 
 	# Mount partitions
-	mount $part2 /mnt
+	mount $sysPart /mnt
 	mkdir /mnt/boot
-	mount $part1 /mnt/boot
+	mount $bootPart /mnt/boot
 fi
 
 # Sorting mirrors by their speed
@@ -190,7 +193,7 @@ if [ isUEFImode = "true" ]; then
 	arch-chroot /mnt << EOF
 		pacman -S refind-efi --noconfirm
 
-		refind-install --usedefault $part1
+		refind-install --usedefault $bootPart
 
 		exit
 	EOF
@@ -198,17 +201,15 @@ if [ isUEFImode = "true" ]; then
 	if [ -e "/mnt/boot/refind_linux.conf" ]; then
 		echo "rEFInd installed"
 	else
-		sysPartUUID=$(blkid -o value -s UUID ${part2})
-		echo "\"Boot with standard options\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap\"" > /mnt/boot/refind_linux.conf
-		echo "\"Boot to single-user mode\"    \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap single\"" >> /mnt/boot/refind_linux.conf
-		echo "\"Boot with minimal options\"   \"ro root=UUID=$sysPartUUID\"" >> /mnt/boot/refind_linux.conf
+		sysPartUUID=$(blkid -o value -s UUID ${sysPart})
+		echo  -e "\"Boot with standard options\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap\"\n\"Boot to single-user mode\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap single\"\n\"Boot with minimal options\" \"ro root=UUID=$sysPartUUID\"" > /mnt/boot/refind_linux.conf
 	fi
 fi
 if [ isUEFImode = "false" ]; then
 	arch-chroot /mnt << EOF
 		pacman -S grub --noconfirm
 		
-		grub-install --target=i386-pc $part1 # Command not found
+		grub-install --target=i386-pc $bootPart # Command not found
 		grub-mkconfig -o /boot/grub/grub.cfg # Command not found
 
 		exit
