@@ -9,6 +9,7 @@ installationDisk="/dev/sda"
 bootPart="/dev/sda1"
 sysPart="/dev/sda2"
 otherOSdisk="/dev/sdb"
+isSWAPwanted=false
 isUEFImode=false
 isConnectedToInternet=false
 yn1="null"
@@ -116,7 +117,7 @@ fi
 timedatectl set-ntp true
 
 # Partitioning and formatting
-if [ $installationMode = 1 ]; then
+if [ $installationMode = 1 -o $installationOption = 2 ]; then
 	bootPart="${installationDisk}1"
 	sysPart="${installationDisk}2"
 	
@@ -146,7 +147,33 @@ if [ $installationMode = 1 ]; then
 	mount $sysPart /mnt
 	mkdir /mnt/boot
 	mount $bootPart /mnt/boot
+
+elif [ $installationMode = 2 -a $installationOption = 1 ]; then
+	diskInfo=$(partprobe -d -s $installationDisk)
+	
+	if [ $diskInfo = *msdos* ]; then
+		if [ $diskInfo = *1 2 3* ]; then
+			if [ $diskInfo = *3 ]; then
+				# Create extended partition and then create system & swap partitions as logical
+			elif [ $diskInfo = *\> ]; then
+				# Create system & swap partitions as logical
+			else # Case "[ $diskInfo = *4 ]" or any other unespected
+				# Return error
+			fi
+		else
+			# Create linux partition as primary
+		fi
+
+		## Free space output
+		# parted $installationDisk print free -m
+
+	else
+	
+	fi
 fi
+
+
+
 
 # Sorting mirrors by their speed
 # THIS NEEDS TO BE CHANGED. RANKMIRRORS WILL BE UNAVAILABLE IN THE NEXT RELEASE OF PACMAN
@@ -204,8 +231,7 @@ if [ isUEFImode = "true" ]; then
 		sysPartUUID=$(blkid -o value -s UUID ${sysPart})
 		echo  -e "\"Boot with standard options\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap\"\n\"Boot to single-user mode\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap single\"\n\"Boot with minimal options\" \"ro root=UUID=$sysPartUUID\"" > /mnt/boot/refind_linux.conf
 	fi
-fi
-if [ isUEFImode = "false" ]; then
+else
 	arch-chroot /mnt << EOF
 		pacman -S grub --noconfirm
 		
