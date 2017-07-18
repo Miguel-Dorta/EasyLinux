@@ -7,16 +7,11 @@ timeZone="/usr/share/zoneinfo/Etc/UTC"
 localHostname="arch"
 installationDisk="/dev/sda"
 bootPart="/dev/sda1"
-sysPart="/dev/sda2"
-otherOSdisk="/dev/sdb"
-isSWAPwanted=false
+rootPart="/dev/sda2"
 isUEFImode=false
-isConnectedToInternet=false
 yn1="null"
-yn2="null"
 declare -a additionalLanguages
 declare -i installationMode=0
-declare -i installationOption=0
 declare -i counter=0
 
 
@@ -79,29 +74,28 @@ timeZone="/usr/share/zoneinfo/$region/$city"
 read -p "Define system's hostname: " localHostname
 
 # Set installation mode
-echo $'\n1/Clean    2/Dual boot (Windows)    3/Dual boot (Mac)'
+echo $'\n1/Clean    2/Advanced'
 read -p "Choose one of the installation methods from the list above: " installationMode
-while [ $installationMode < 1 -o $installationMode > 3 ]; do
-	read -p "Please, write the number of the installation methods above: " installationMode
+while [ $installationMode < 1 -o $installationMode > 2 ]; do
+	read -p "Please, write \"1\" or \"2\" (without quotes): " installationMode
 done
-if [ $installationMode != 1 ]; then
-	echo $'\n1/Both OS in the same disk    2/Each OS in a different disk'
-	read -p "Choose one of the options: " installationOption
-	while [ $installationOption < 1 -o $installationOption > 2 ]; do
-		read -p "Please, write the number of the options above: " installationOption
-	done
-fi
-if [ $installationOption = 2 ]; then
-	read -p "Do you want to use a boot manager in common? [y/n]: " yn2
-	while [ $yn2 != "y" -a $yn2 != "n" ]; do
-		read -p "Please, write \"y\" or \"n\" (without quotes): " yn2
-	done
-fi
+
 echo " "
-parted -l
-read -p "Select the disk you want to install ArchLinux: " installationDisk
-if [ $yn2 = "y" ]; then
-	read -p "Select the disk where the other OS is installed: " otherOSdisk
+if [ installationMode = 1 ]; then
+	# Set disk to clean
+	parted $installationDisk print devices
+	read -p "Select the disk you want to install ArchLinux (press ENTER for more info): " installationDisk
+	if [ -z $installationDisk ]; then
+		parted -l
+		read -p "Select the disk you want to install ArchLinux: " installationDisk
+	fi
+else
+	# Set partitions (advanced mode)
+	fdisk -l
+	read -p "Introduce the root (/) partition: " rootPart
+	read -p "Introduce the boot (/boot) partition: " bootPart
+	read -p "Introduce the home (/home) partition (ENTER to skip): " homePart
+	read -p "Introduce the SWAP partition (ENTER to skip): " swapPart
 fi
 
 
@@ -117,9 +111,10 @@ fi
 timedatectl set-ntp true
 
 # Partitioning and formatting
-if [ $installationMode = 1 -o $installationOption = 2 ]; then
+if [ $installationMode = 1 ]; then
 	bootPart="${installationDisk}1"
-	sysPart="${installationDisk}2"
+	swapPart="${installationDisk}2"
+	rootPart="${installationDisk}3"
 	
 	if [ $isUEFImode = true ]; then
 		# Make partition table
@@ -139,41 +134,26 @@ if [ $installationMode = 1 -o $installationOption = 2 ]; then
 		mkfs.ext4 $bootPart
 		tune2fs -O ^has_journal $bootPart
 	fi
+	# Make swap partition
+	parted $installationDisk mkpart primary swap 513MiB 2561MiB
+
 	# Make system partition
-	parted $installationDisk mkpart primary xfs 513MiB 100%
-	mkfs.xfs $sysPart -f
-
-	# Mount partitions
-	mount $sysPart /mnt
-	mkdir /mnt/boot
-	mount $bootPart /mnt/boot
-
-elif [ $installationMode = 2 -a $installationOption = 1 ]; then
-	diskInfo=$(partprobe -d -s $installationDisk)
-	
-	if [ $diskInfo = *msdos* ]; then
-		if [ $diskInfo = *1 2 3* ]; then
-			if [ $diskInfo = *3 ]; then
-				# Create extended partition and then create system & swap partitions as logical
-			elif [ $diskInfo = *\> ]; then
-				# Create system & swap partitions as logical
-			else # Case "[ $diskInfo = *4 ]" or any other unespected
-				# Return error
-			fi
-		else
-			# Create linux partition as primary
-		fi
-
-		## Free space output
-		# parted $installationDisk print free -m
-
-	else
-	
-	fi
+	parted $installationDisk mkpart primary xfs 2561MiB 100%
+	mkfs.xfs $rootPart -f
 fi
 
-
-
+# Mount partitions
+mount $rootPart /mnt
+mkdir /mnt/boot
+mount $bootPart /mnt/boot
+if [[ $homePart ]]; then
+	mkdir /mnt/home
+	mount $homePart /mnt/home
+fi
+if [[ $swapPart ]]; then
+	mkswap $swapPart
+	swapon $swapPart
+fi
 
 # Sorting mirrors by their speed
 # THIS NEEDS TO BE CHANGED. RANKMIRRORS WILL BE UNAVAILABLE IN THE NEXT RELEASE OF PACMAN
@@ -228,7 +208,7 @@ if [ isUEFImode = "true" ]; then
 	if [ -e "/mnt/boot/refind_linux.conf" ]; then
 		echo "rEFInd installed"
 	else
-		sysPartUUID=$(blkid -o value -s UUID ${sysPart})
+		sysPartUUID=$(blkid -o value -s UUID ${rootPart})
 		echo  -e "\"Boot with standard options\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap\"\n\"Boot to single-user mode\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap single\"\n\"Boot with minimal options\" \"ro root=UUID=$sysPartUUID\"" > /mnt/boot/refind_linux.conf
 	fi
 else
