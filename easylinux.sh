@@ -8,12 +8,15 @@ localHostname="arch"
 installationDisk="/dev/sda"
 bootPart="/dev/sda1"
 rootPart="/dev/sda2"
+installationMode="0"
 isUEFImode=false
 yn1="null"
 declare -a additionalLanguages
-declare -i installationMode=0
 declare -i counter=0
 
+
+# Change working directory
+cd /
 
 # Previous checking of internet connection
 if ping -c 1 archlinux.org &> /dev/null; then
@@ -76,12 +79,12 @@ read -p "Define system's hostname: " localHostname
 # Set installation mode
 echo $'\n1/Clean    2/Advanced'
 read -p "Choose one of the installation methods from the list above: " installationMode
-while [ $installationMode < 1 -o $installationMode > 2 ]; do
+while [ $installationMode != 1 -a $installationMode != 2 ]; do
 	read -p "Please, write \"1\" or \"2\" (without quotes): " installationMode
 done
 
 echo " "
-if [ installationMode = 1 ]; then
+if [ $installationMode = "1" ]; then
 	# Set disk to clean
 	parted $installationDisk print devices
 	read -p "Select the disk you want to install ArchLinux (press ENTER for more info): " installationDisk
@@ -111,7 +114,7 @@ fi
 timedatectl set-ntp true
 
 # Partitioning and formatting
-if [ $installationMode = 1 ]; then
+if [ $installationMode = "1" ]; then
 	bootPart="${installationDisk}1"
 	swapPart="${installationDisk}2"
 	rootPart="${installationDisk}3"
@@ -135,7 +138,7 @@ if [ $installationMode = 1 ]; then
 		tune2fs -O ^has_journal $bootPart
 	fi
 	# Make swap partition
-	parted $installationDisk mkpart primary swap 513MiB 2561MiB
+	parted $installationDisk mkpart primary linux-swap 513MiB 2561MiB
 
 	# Make system partition
 	parted $installationDisk mkpart primary xfs 2561MiB 100%
@@ -174,52 +177,63 @@ while [[ ${additionalLanguages[$counter]} ]]; do
 	counter+=1
 done
 
-# Operating now into the new system
+# Creating a sub-script in the new system to configure it up
+echo -e "
+	#!/bin/bash
+\n	
+\n	isUEFImode=$isUEFImode
+\n	
+\n	# Configure time zone
+\n	ln -sf $timeZone /etc/localtime
+\n	hwclock --systohc
+\n	
+\n	# Configure locations
+\n	locale-gen
+\n	echo \"LANG=$language.UTF-8\" > /etc/locale.conf
+\n	echo \"KEYMAP=$keyboardLayout\" > /etc/vconsole.conf
+\n	
+\n	# Configure hostname
+\n	echo $localHostname > /etc/hostname
+\n	sed -i \"8i 127.0.1.1 $localHostname.localdomain $localHostname\" /etc/hosts
+\n	
+\n	# Installing NetworkManager
+\n	pacman -S networkmanager --noconfirm
+\n	
+\n	systemctl disable dhcpcd.service
+\n	systemctl disable dhcpcd@enp0s3.service
+\n	systemctl enable NetworkManager
+\n	
+\n	# Installing boot manager
+\n	if [ isUEFImode = \"true\" ]; then
+\n		pacman -S refind-efi --noconfirm
+\n	
+\n		refind-install --usedefault $bootPart
+\n	else
+\n		pacman -S grub --noconfirm
+\n		
+\n		grub-install --target=i386-pc $bootPart # Command not found
+\n		grub-mkconfig -o /boot/grub/grub.cfg # Command not found
+\n	fi
+\n	
+\n	exit
+" > /mnt/sub-script.sh
+
+# Open the sub-script in the new system
 arch-chroot /mnt << EOF
-	ln -sf $timeZone /etc/localtime
-	hwclock --systohc
-
-	locale-gen
-	echo "LANG=$language.UTF-8" > /etc/locale.conf
-	echo "KEYMAP=$keyboardLayout" > /etc/vconsole.conf
-
-	echo $localHostname > /etc/hostname
-	sed -i "8i 127.0.1.1 $localHostname.localdomain $localHostname" /etc/hosts
-
-	pacman -S networkmanager --noconfirm
-
-	systemctl disable dhcpcd.service
-	systemctl disable dhcpcd@enp0s3.service
-	systemctl enable NetworkManager
+	cd /
+	./sub-script.sh
 
 	exit
 EOF
 
-# Installing boot manager
+# Check if boot manager is configured
 if [ isUEFImode = "true" ]; then
-	arch-chroot /mnt << EOF
-		pacman -S refind-efi --noconfirm
-
-		refind-install --usedefault $bootPart
-
-		exit
-	EOF
-
 	if [ -e "/mnt/boot/refind_linux.conf" ]; then
 		echo "rEFInd installed"
 	else
 		sysPartUUID=$(blkid -o value -s UUID ${rootPart})
-		echo  -e "\"Boot with standard options\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap\"\n\"Boot to single-user mode\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap single\"\n\"Boot with minimal options\" \"ro root=UUID=$sysPartUUID\"" > /mnt/boot/refind_linux.conf
+		echo -e "\"Boot with standard options\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap\"\n\"Boot to single-user mode\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap single\"\n\"Boot with minimal options\" \"ro root=UUID=$sysPartUUID\"" > /mnt/boot/refind_linux.conf
 	fi
-else
-	arch-chroot /mnt << EOF
-		pacman -S grub --noconfirm
-		
-		grub-install --target=i386-pc $bootPart # Command not found
-		grub-mkconfig -o /boot/grub/grub.cfg # Command not found
-
-		exit
-	EOF
 fi
 
 # Umount partitions & reboot
