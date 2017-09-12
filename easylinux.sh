@@ -171,7 +171,7 @@ genfstab -U /mnt >> /mnt/etc/fstab
 
 # Adding locations
 echo "$language.UTF-8 UTF-8" >> /mnt/etc/locale.gen
-for otherLang in additionalLanguages; do
+for otherLang in ${additionalLanguages[@]}; do
 	echo "$otherLang.UTF-8 UTF-8" >> /mnt/etc/locale.gen
 done
 
