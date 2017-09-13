@@ -20,8 +20,9 @@ You'll be able to set up:
 
 ### What is the difference between "Clean" and "Advanced" installation mode?
 The clean mode wipes out the entire disk that you define, and then it creates the following partition layout:
+
 | Mount point   | Type                | Size        |
-| ------------- |:-------------------:| -----------:|
+| ------------- | ------------------- | ----------- |
 | /boot         | EFI (FAT32) or ext4 |     512 MiB |
 | [SWAP]        | Linux swap          |       2 GiB |
 | /             | xfs                 |   Remainder |
