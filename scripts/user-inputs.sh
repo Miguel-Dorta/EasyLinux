@@ -16,8 +16,14 @@ declare -a additionalLanguages
 # Change working directory
 cd /
 
+# Getting list of keyboard layouts
+mkdir /tmp/klayout
+cp /usr/share/kbd/keymaps/**/*.map.gz /tmp/klayout
+(cd /tmp/klayout && rename ".map.gz" "" *)
+
 # Set keyboard layout
-read -p "Define your keyboard layout (default \"us\"): " keyboardLayout
+(cd /tmp/klayout && ls)
+read -p "Choose your keyboard layout from the list above (default \"us\"): " keyboardLayout
 loadkeys $keyboardLayout
 
 # Set main language

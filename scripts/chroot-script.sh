@@ -24,7 +24,7 @@ systemctl disable dhcpcd@enp0s3.service
 systemctl enable NetworkManager
 
 # Installing boot manager
-if [ isUEFImode = "true" ]; then
+if [ $isUEFImode = "true" ]; then
 	pacman -S refind-efi --noconfirm
 	refind-install --usedefault $bootPart
 	if [ -e "/boot/refind_linux.conf" ]; then
