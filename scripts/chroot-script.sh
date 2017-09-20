@@ -30,10 +30,10 @@ if [ $isUEFImode = "true" ]; then
 	if [ -e "/boot/refind_linux.conf" ]; then
 		echo "rEFInd installed"
 	else
-		sysPartUUID=$(blkid -o value -s UUID ${rootPart})
-		echo -e "\"Boot with standard options\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap\"
-		\"Boot to single-user mode\" \"rw root=UUID=$sysPartUUID rootfstype=xfs add_efi_memmap single\"
-		\"Boot with minimal options\" \"ro root=UUID=$sysPartUUID\"" > /boot/refind_linux.conf
+		sysPartUUID=$(blkid -o value -s PARTUUID ${rootPart})
+		echo -e "\"Boot with standard options\" \"rw root=PARTUUID=$sysPartUUID rootfstype=xfs add_efi_memmap\"
+		\"Boot to single-user mode\" \"rw root=PARTUUID=$sysPartUUID rootfstype=xfs add_efi_memmap single\"
+		\"Boot with minimal options\" \"ro root=PARTUUID=$sysPartUUID\"" > /boot/refind_linux.conf
 	fi
 else
 	pacman -S grub --noconfirm
