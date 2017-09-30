@@ -3,7 +3,7 @@ Script to make ArchLinux installation simple
 
 ### How to use it?
 - Boot your system from the Archlinux installation disk.
-- Download the script: `wget https://raw.githubusercontent.com/Miguel-Dorta/EasyLinux/master/easylinux.sh`
+- Download the script: `wget https://git.io/easylinux.sh`
 - Mark it as executable: `chmod +x easylinux.sh`
 - Run it: `./easylinux.sh`
 
