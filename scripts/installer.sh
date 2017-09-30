@@ -10,7 +10,7 @@ cd /
 timedatectl set-ntp true
 
 # Partitioning and formatting
-if [ $installationMode = "1" ]; then
+if [ $partitionMode = "1" ]; then
 	bootPart="${installationDisk}1"
 	swapPart="${installationDisk}2"
 	rootPart="${installationDisk}3"

@@ -8,7 +8,10 @@ localHostname="arch"
 installationDisk="/dev/sda"
 bootPart="/dev/sda1"
 rootPart="/dev/sda2"
+partitionMode="0"
 installationMode="0"
+displayDriver="6"
+desktopEnv="1"
 isUEFImode=false
 yn1="null"
 declare -a additionalLanguages
@@ -68,15 +71,15 @@ timeZone="/usr/share/zoneinfo/$region/$city"
 # Set hostname
 read -p "Define system's hostname: " localHostname
 
-# Set installation mode
+# Set partitioning mode
 echo $'\n1/Clean    2/Advanced'
-read -p "Choose one of the installation methods from the list above: " installationMode
-while [ $installationMode != 1 -a $installationMode != 2 ]; do
-	read -p "Please, write \"1\" or \"2\" (without quotes): " installationMode
+read -p "Choose one of the partitioning methods from the list above: " partitionMode
+while [ $partitionMode != 1 -a $partitionMode != 2 ]; do
+	read -p "Please, write \"1\" or \"2\" (without quotes): " partitionMode
 done
 
 echo " "
-if [ $installationMode = "1" ]; then
+if [ $partitionMode = "1" ]; then
 	# Set disk to clean
 	parted $installationDisk print devices
 	read -p "Select the disk you want to install ArchLinux (press ENTER for more info): " installationDisk
@@ -93,6 +96,25 @@ else
 	read -p "Introduce the SWAP partition (ENTER to skip): " swapPart
 fi
 
+# Set installation mode
+echo $'\n  1/Easy (recommended for beginners in Linux)\n  2/Advanced (recommended for those who have used other Linux distributions)\n  3/Expert (recommended for those who have installed ArchLinux before)\n'
+read -p "Choose one of the installation methods from the list above: " installationMode
+while [ $installationMode != 1 -a $installationMode != 2 -a $installationMode != 3]; do
+	read -p "Please, write \"1\", \"2\" or \"3\" (without quotes): " installationMode
+done
+
+# Set display driver
+if [ $installationMode != 3 ]; then
+	echo $'\n1/Intel    2/AMD    3/Nvidia    4/Oracle VirtualBox    5/VMware    6/Otro'
+	read -p "Choose your display driver (default \"6\"): " displayDriver
+
+	# Set desktop environment
+	if [ $installationMode = 2 ]; then
+		echo $'\n1/GNOME    2/KDE    3/Xfce'
+		read -p "Choose one of the desktop environment from the list above (default \"1\"): " desktopEnv
+	fi
+fi
+
 
 ### Write config file ###
 echo -e "# EasyLinux config file
@@ -100,8 +122,11 @@ keyboardLayout=$keyboardLayout
 language=$language
 timeZone=$timeZone
 localHostname=$localHostname
+partitionMode=$partitionMode
 installationMode=$installationMode
 installationDisk=$installationDisk
+displayDriver=$displayDriver
+desktopEnv=$desktopEnv
 rootPart=$rootPart
 bootPart=$bootPart" > /EasyLinux/easylinux.config
 # Add additionals partitions if they exist
