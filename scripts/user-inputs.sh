@@ -118,6 +118,7 @@ fi
 
 ### Write config file ###
 echo -e "# EasyLinux config file
+additionalLanguages=(${additionalLanguages[@]})
 keyboardLayout=$keyboardLayout
 language=$language
 timeZone=$timeZone
@@ -143,8 +144,3 @@ else
 	isUEFImode=false
 fi
 echo "isUEFImode=$isUEFImode" >> /EasyLinux/easylinux.config
-# Add language code
-echo "declare -a additionalLanguages" >> /EasyLinux/easylinux.config
-for otherLang in ${additionalLanguages[@]}; do
-	echo "additionalLanguages+=($otherLang)" >> /EasyLinux/easylinux.config
-done
